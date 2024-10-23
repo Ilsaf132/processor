@@ -51,7 +51,7 @@ void StackDump(struct Stack_t* stk) {
             if (stk -> size < huge_const_t && stk -> size <= stk -> capacity) {
                 printf("elements of stack:\n");
                 for(size_t i = 0; i < stk -> size; ++i) {
-                    printf_int(i + 1, stk -> data[i]);
+                    printf_int(i + 1, stk -> data[i + 1]);
                 }
             }
             printf("canary left: %llx\n", stk -> left_canary);

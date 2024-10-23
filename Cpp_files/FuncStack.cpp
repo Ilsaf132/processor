@@ -12,7 +12,7 @@ Error_t StackPush(struct Stack_t* stk, stackElem_t elem) {
         memset(stk -> data + sizeof(stackElem_t)*((stk -> capacity)/2 + 1), StackNull_t, sizeof(stackElem_t)*(stk -> capacity)/2);
         stk -> data[stk -> capacity + 1] = canary_data_t;
 
-        printf("New capacity: %d\n", stk -> capacity);
+        ON_DEBUG(printf("New capacity: %d\n", stk -> capacity);)
     }
 
     stk -> data[stk -> size + 1] = elem;
@@ -20,8 +20,8 @@ Error_t StackPush(struct Stack_t* stk, stackElem_t elem) {
     stk -> hash_s.hash_data = Hash((char*) stk -> data, sizeof(stackElem_t)*(stk -> capacity + 2));
     stk -> hash_s.hash_stack = Hash((char*) stk + first_bite_stk, stk_bites);
 
-    printf("New ");
-    printf_int(stk -> size, elem);
+    ON_DEBUG(printf("New ");)
+    ON_DEBUG(printf_int(stk -> size, elem);)
 
     StackAssert(stk);
     return FOUND_OK;
@@ -42,16 +42,16 @@ Error_t StackPop(struct Stack_t* stk, stackElem_t* elem) {
         StackCapacityRealloc(stk, stk -> capacity / 4);
         stk -> data[stk -> capacity + 1] = canary_data_t;
 
-        printf("New capacity: %d\n", stk -> capacity);
+        ON_DEBUG(printf("New capacity: %d\n", stk -> capacity);)
     }
 
     --stk -> size;
-    printf("size: %d\n", stk -> size);
+    ON_DEBUG(printf("size: %d\n", stk -> size);)
 
     *elem = stk -> data[stk -> size + 1];
     stk -> data[stk -> size + 1] = StackNull_t;
-    printf("Deleted ");
-    printf_int(stk -> size + 1, *elem);
+    ON_DEBUG(printf("Deleted ");
+    printf_int(stk -> size + 1, *elem);)
 
     stk -> hash_s.hash_data = Hash((char*) stk -> data, sizeof(stackElem_t)*(stk -> capacity + 2));
     stk -> hash_s.hash_stack = Hash((char*) stk + first_bite_stk, stk_bites);
@@ -75,6 +75,8 @@ Error_t StackCtor(struct Stack_t* stk ON_DEBUG(, const char* name, const char* f
     stk -> data[start_t + 1] = canary_data_t;
     stk -> size = 0;
     stk -> capacity = start_t;
+    stk -> left_canary = left_check_t;
+    stk -> right_canary = right_check_t;
 
     #ifdef DEBUG
         stk -> name = name;

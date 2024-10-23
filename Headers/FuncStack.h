@@ -5,7 +5,7 @@
 #include "Check.h"
 
 struct Stack_t {
-    canary_type left_canary = left_check_t;
+    canary_type left_canary;
     ON_DEBUG(const char* name;)
     ON_DEBUG(const char* file;)
     ON_DEBUG(int line;)
@@ -13,7 +13,7 @@ struct Stack_t {
     size_t size; 
     size_t capacity; 
     HashStruct hash_s; 
-    canary_type right_canary = right_check_t;
+    canary_type right_canary;
 };
 
 Error_t StackCtor(struct Stack_t* stk ON_DEBUG(, const char* name, const char* file, int line));
