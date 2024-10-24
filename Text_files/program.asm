@@ -1,9 +1,12 @@
-push ax
-pop ax
-push 4
-pop [ax+5]
-push 8
-push [ax+5]
-mul
+push 1.004
+call HOME:
+sqrt
+dump
+sub
 out
 hlt
+HOME:
+pop [5]
+push [5]
+push 90.000
+ret

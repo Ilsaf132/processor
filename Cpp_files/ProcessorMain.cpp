@@ -17,6 +17,7 @@ Error_proc RunCode(struct SPU* proc_t);
 Error_proc InitProcessor(struct SPU* proc_t, char** code_txt, FILE* fp, const char* file_read);
 Error_proc DumpProcessor(struct SPU* proc_t);
 Error_proc DtorProcessor(struct SPU* proc_t);
+void VideoCard(struct SPU* proc_t);
 int CharToInt(char* word);
 int GetArgPush(struct SPU* proc_t);
 int* GetArgPop(struct SPU* proc_t);
@@ -34,6 +35,7 @@ struct SPU {
     elem_t* code;
     elem_t* registers;
     struct Stack_t stk; 
+    struct Stack_t stk_adr;
     elem_t* RAM;
     int ip;
     int size;
@@ -73,6 +75,7 @@ Error_proc RunCode(struct SPU* proc_t) {
         elem_t b = 0;
         elem_t elem = 0;
         int elem_pop = 0;
+        double elem_double = 0;
         int* addr = 0;
         switch(proc_t -> code[proc_t -> ip]) {
             case PUSH_CODE: StackPush(&proc_t -> stk, GetArgPush(proc_t));
@@ -92,42 +95,45 @@ Error_proc RunCode(struct SPU* proc_t) {
             
             case DIV_CODE:  StackPop(&proc_t -> stk, &a);
                             StackPop(&proc_t -> stk, &b);
-                            StackPush(&proc_t -> stk, b/a);
+                            StackPush(&proc_t -> stk, (b*accuracy_ten)/a);
                             proc_t -> ip += 1;
                             break;
 
-            case MUL_CODE:  DumpProcessor(proc_t); // отладочный дамп
-                            StackPop(&proc_t -> stk, &a);
+            case MUL_CODE:  StackPop(&proc_t -> stk, &a);
                             StackPop(&proc_t -> stk, &b);
-                            StackPush(&proc_t -> stk, a*b);
+                            StackPush(&proc_t -> stk, (a*b)/accuracy_ten);
                             proc_t -> ip += 1;
                             break;
             
             case OUT_CODE:  StackPop(&proc_t -> stk, &a);
-                            printf("%d\n", a);
+                            printf("%.*lf\n", accuracy, double(a)/accuracy_ten);
                             proc_t -> ip += 1;
                             break;
             
-            case IN_CODE:   scanf("%d", &a);
+            case IN_CODE:   scanf("%.*lf", accuracy, &elem_double);
+                            StackPush(&proc_t -> stk, (int)(elem_double*accuracy_ten));
                             proc_t -> ip += 1;
                             break;
 
-            case DUMP_CODE: //Dump func
+            case DUMP_CODE: DumpProcessor(proc_t);
                             proc_t -> ip += 1;
                             break;
             
             case SQRT_CODE: StackPop(&proc_t -> stk, &elem);
-                            StackPush(&proc_t -> stk, sqrt(elem));
+                            elem_double = sqrt(double(elem) / accuracy_ten);
+                            StackPush(&proc_t -> stk, (int)(elem_double*accuracy_ten));
                             proc_t -> ip += 1;
                             break; 
             
             case SIN_CODE:  StackPop(&proc_t -> stk, &elem);
-                            StackPush(&proc_t -> stk, sin(elem));
+                            elem_double = sin(double(elem) / accuracy_ten);
+                            StackPush(&proc_t -> stk, (int)(elem_double*accuracy_ten));
                             proc_t -> ip += 1;
                             break; 
 
             case COS_CODE:  StackPop(&proc_t -> stk, &elem);
-                            StackPush(&proc_t -> stk, cos(elem));
+                            elem_double = cos(double(elem) / accuracy_ten);
+                            StackPush(&proc_t -> stk, (int)(elem_double*accuracy_ten));
                             proc_t -> ip += 1;
                             break; 
             
@@ -150,8 +156,11 @@ Error_proc RunCode(struct SPU* proc_t) {
             
             case JB_CODE:   StackPop(&proc_t -> stk, &a);
                             StackPop(&proc_t -> stk, &b);
+                            printf("a: %d,  b: %d\n", a,b);
                             if (b < a) proc_t -> ip = proc_t -> code[proc_t -> ip + 1];
                             else proc_t -> ip += 2;
+                            printf("ip: %d\n", proc_t -> ip);
+                            printf("jb to: %d\n",  proc_t -> code[proc_t -> ip + 1]);
                             break;
             
             case JBE_CODE:  StackPop(&proc_t -> stk, &a);
@@ -173,6 +182,14 @@ Error_proc RunCode(struct SPU* proc_t) {
                             break;
                         
             case JMP_CODE:  proc_t -> ip = proc_t -> code[proc_t -> ip + 1];
+                            printf("jmp to: %d\n",  proc_t -> code[proc_t -> ip + 1]);
+                            break;
+
+            case CALL_CODE: StackPush(&proc_t -> stk_adr, proc_t -> ip + 2);
+                            proc_t -> ip = proc_t -> code[proc_t -> ip + 1];
+                            break;
+
+            case RET_CODE:  StackPop(&proc_t -> stk_adr, &proc_t -> ip);
                             break;
             
             case HLT_CODE:  printf("Program`s end\n");
@@ -184,6 +201,20 @@ Error_proc RunCode(struct SPU* proc_t) {
         }
     }
     return ERROR_OK;
+}
+
+void VideoCard(struct SPU* proc_t) {
+    for(int i = 0; i < RAM_SQRT; ++i) {
+        for(int j = 0; j < RAM_SQRT; ++j) {
+            if(proc_t -> RAM[i*RAM_SQRT + j] == 0) {
+                printf(".");
+            } else {
+                printf("*");
+            }
+        }
+        printf("\n           ");
+    }
+    printf("\n");
 }
 
 int GetArgPush(struct SPU* proc_t) {
@@ -242,13 +273,13 @@ Error_proc InitProcessor(struct SPU* proc_t, char** code_txt, FILE* fp, const ch
         return ERROR_ADDRESS_FILE;
     }
 
-    StackCtor(&proc_t -> stk);
-
     struct stat buf = {};
     stat(file_read, &buf);
     long int code_len = buf.st_size;
     printf("code len: %ld\n", code_len);
-
+    
+    StackCtor(&proc_t -> stk);
+    StackCtor(&proc_t -> stk_adr);
     proc_t -> code = (elem_t*) calloc(code_len, sizeof(elem_t));
     *code_txt = (char*) calloc(code_len, sizeof(char));
     proc_t -> ip = 0;
@@ -344,12 +375,15 @@ Error_proc DumpProcessor(struct SPU* proc_t) {
         printf(" %0*d", proc_t -> max_len_code, proc_t -> stk.data[i+1]);
     }
     printf("\n");
+    printf("VideoCard: ");
+    VideoCard(proc_t);
 
     printf("----------");
     for(size_t i = 0; i < (proc_t -> max_len_code+1)*(proc_t -> size); ++i) {
         printf("-");
     }
     printf("\n");
+
 
     return ERROR_OK;
 }
