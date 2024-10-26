@@ -1,11 +1,27 @@
 #include <stdio.h>
 #include <string.h>
+#include <strings.h>
 #include <sys/stat.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <stdint.h>
 #include <ctype.h>
-#include "ErrorsProcessor.h"
+#include "ProcessorConstants.h"
+
+#define DEF_CMD(name, num, arg, ...) if (mystricmp(word, #name) == 0) {\
+                                            if(arg == 2) {\
+                                                JumpCode(name##_CODE, &cnt, labels, fw);\
+                                            } else {\
+                                                fprintf(fw, "%d ", name##_CODE);\
+                                                if(arg == 1) {\
+                                                    if(GetCodePush(fw, &cnt)) {\
+                                                        return ERROR_ARG_NAME;\
+                                                    }\
+                                                } else {\
+                                                    fprintf(fw, "\n");\
+                                                }\
+                                            }\
+                                    } else
 
 struct Labels_t {
     int address;
@@ -19,10 +35,9 @@ struct Table_labels {
 };
 
 struct Header {
-    const char* signature;
-    const char* version;
-    char size[SIZE_ASM];
-    uint32_t reserved;
+    char sign[HEADER_SIGN_LEN];
+    uint32_t version;
+    uint32_t size;
 };
 
 Error_proc InitAssembler(struct Table_labels* labels, char** array_text, long int* text_len, const char* file_read);
@@ -33,12 +48,13 @@ Error_proc FullingLabels(struct Table_labels* labels, int* cnt, char* word);
 Error_proc CheckLabel(char* word, char* colon);
 Error_proc CheckNumName(char* word);
 Error_proc CheckRegisterName(char* word);
-void CreateSignature(FILE* fp, long int size);
+void CreateSignature(FILE* fp, Header header);
 void JumpCode(Code_const jump, int* cnt, Table_labels* labels, FILE* fw);
 int Register(char* word);
 int FindLabel(char* word, struct Table_labels* labels);
 void FprintfLabelAddress(FILE* fp, struct Table_labels* labels, char* word);
 void GetLabel(char* name, char word[20]);
+int mystricmp(const char* word1, const char* word2);
 int StrToDouble(char numb_push[NUMBERS_LEN]);
 Error_proc GetCodePush(FILE* fp, int* cnt);
 Error_proc PutWordsPush(FILE* fp, char* word, int* cnt, int code_plus, int code_reg, int code_numb);
@@ -83,15 +99,15 @@ Error_proc InitAssembler(struct Table_labels* labels, char** array_text, long in
     if(array_text == NULL) {
         printf("text address is null!\n");
         return ERROR_ADDRESS_TEXT;
-    }  
+    }
 
     struct stat buf = {};
     stat(file_read,&buf);
     *text_len = buf.st_size;
 
-    labels -> array = (struct Labels_t*) calloc(LABELS_SIZE_MAX, sizeof(struct Labels_t));
+    labels -> array = (struct Labels_t*) calloc(LABELS_MAX_SIZE, sizeof(struct Labels_t));
     *array_text = (char*) calloc(*text_len, sizeof(char));
-    labels -> max_len = MAX_LEN_NAME;
+    labels -> max_len = REG_LEN;
     labels -> size = 0;
 
     printf("array_text: %p\n", *array_text);
@@ -105,7 +121,7 @@ Error_proc DumpLabels(struct Table_labels* labels) {
     } 
 
 
-    for(int i = 0; i < LABELS_SIZE_MAX*(MAX_LEN_NAME + 1) + 8; ++i) {
+    for(int i = 0; i < LABELS_MAX_SIZE*(REG_LEN + 1) + 8; ++i) {
         printf("-");
     }
     printf("\n");
@@ -113,18 +129,18 @@ Error_proc DumpLabels(struct Table_labels* labels) {
     printf("labels size: %d\n", labels -> size);
 
     printf("name:   ");
-    for(int i = 0; i < LABELS_SIZE_MAX; ++i) {
+    for(int i = 0; i < LABELS_MAX_SIZE; ++i) {
         printf("%*s ", labels -> max_len, labels -> array[i].name);
     }
     printf("\n");
 
     printf("address:");
-    for(int i = 0; i < LABELS_SIZE_MAX; ++i) {
+    for(int i = 0; i < LABELS_MAX_SIZE; ++i) {
         printf("%*x ", labels -> max_len, labels -> array[i].address);
     }
     printf("\n");
 
-    for(int i = 0; i < LABELS_SIZE_MAX*(MAX_LEN_NAME + 1) + 8; ++i) {
+    for(int i = 0; i < LABELS_MAX_SIZE*(REG_LEN + 1) + 8; ++i) {
         printf("-");
     }
     printf("\n");
@@ -162,108 +178,16 @@ Error_proc Assembler(char* array_text, long int text_len, struct Table_labels* l
     FILE* fw = fopen(file_write, "w");
     fread(array_text, text_len, 1, fr);
 
-    CreateSignature(fw, text_len);
+    Header header = {"IBB", 1, (uint32_t)text_len};
+    CreateSignature(fw, header);  
 
     if(fw && fr) {
         char* word = strtok(array_text, " \r\n");
         int cnt = 0;
 
         while(word != NULL) {
-            if(strcmp(word, "push") == 0) {
-
-                fprintf(fw, "%d ", PUSH_CODE);
-                if(GetCodePush(fw, &cnt)) {
-                    return ERROR_ARG_NAME;
-                }
-
-            } else if(strcmp(word, "add") == 0) {
-
-                fprintf(fw, "%d\n", ADD_CODE);
-
-            } else if(strcmp(word, "sub") == 0) {
-
-                fprintf(fw, "%d\n", SUB_CODE);
-
-            } else if(strcmp(word, "div") == 0) {
-
-                fprintf(fw, "%d\n", DIV_CODE);
-
-            } else if(strcmp(word, "mul") == 0) {
-
-                fprintf(fw, "%d\n", MUL_CODE);
-
-            } else if(strcmp(word, "out") == 0) {
-
-                fprintf(fw, "%d\n", OUT_CODE);
-
-            } else if(strcmp(word, "in") == 0) {
-
-                fprintf(fw, "%d\n", IN_CODE);
-
-            } else if(strcmp(word, "dump") == 0) {
-
-                fprintf(fw, "%d\n", DUMP_CODE);
-
-            } else if(strcmp(word, "sqrt") == 0) {
-
-                fprintf(fw, "%d\n", SQRT_CODE);
-
-            } else if(strcmp(word, "sin") == 0) {
-
-                fprintf(fw, "%d\n", SIN_CODE);
-
-            } else if(strcmp(word, "cos") == 0) {
-
-                fprintf(fw, "%d\n", COS_CODE);
-
-            } else if (strcmp(word, "pop") == 0) {
-
-                fprintf(fw, "%d ", POP_CODE);
-                if(GetCodePush(fw, &cnt)) {
-                    return ERROR_ARG_NAME;
-                }
-
-            } else if (strcmp(word, "ja") == 0) {
-
-                JumpCode(JA_CODE, &cnt, labels, fw);
-
-            } else if (strcmp(word, "jae") == 0) {
-
-                JumpCode(JAE_CODE, &cnt, labels, fw);
-
-            } else if (strcmp(word, "jb") == 0) {
-
-                JumpCode(JB_CODE, &cnt, labels, fw);
-
-            } else if (strcmp(word, "jbe") == 0) {
-
-                JumpCode(JBE_CODE, &cnt, labels, fw);
-
-            } else if (strcmp(word, "je") == 0) {
-
-                JumpCode(JE_CODE, &cnt, labels, fw);
-
-            } else if (strcmp(word, "jne") == 0) {
-
-                JumpCode(JNE_CODE, &cnt, labels, fw);
-
-            } else if (strcmp(word, "jmp") == 0) {
-
-                JumpCode(JMP_CODE, &cnt, labels, fw);
-
-            } else if (strcmp(word, "call") == 0) {
-
-                JumpCode(CALL_CODE, &cnt, labels, fw);  
-
-            } else if (strcmp(word, "ret") == 0) {
-
-                fprintf(fw, "%d\n", RET_CODE);
-                
-            } else if(strcmp(word, "hlt") == 0) {
-
-                fprintf(fw, "%d\n", HLT_CODE);
-
-            } else if (strchr(word, ':')) {
+            #include "Commands.h" 
+            if (strchr(word, ':')) {
 
                 if (iteration == 0) {
                     if(CheckLabel(word, strchr(word, ':'))) {
@@ -280,8 +204,8 @@ Error_proc Assembler(char* array_text, long int text_len, struct Table_labels* l
                 fclose(fr);
                 return ERROR_WRONG_COMMAND;
             }
-
             word = strtok(NULL, " \r\n");
+            printf("words: %s\n", word);
             cnt++;
         }
     } else {
@@ -293,15 +217,20 @@ Error_proc Assembler(char* array_text, long int text_len, struct Table_labels* l
     fclose(fr);
     return ERROR_OK;
 }
+#undef DEF_CMD
 
-void CreateSignature(FILE* fp, long int size) {
-    struct Header hdr = {};
-    hdr.signature = "ILSAF";
-    hdr.version = "24.10.2024";
-    sprintf(hdr.size, "%ld", size);
-    fprintf(fp, "signature: %s\n", hdr.signature);
-    fprintf(fp, "version:   %s\n", hdr.version);
-    fprintf(fp, "size:      %s\n", hdr.size);
+int mystricmp(const char* word1, const char* word2) {
+
+    while (*word1 && toupper(*word2) == toupper(*word1)){
+        word1++;
+        word2++;
+    }
+    return *word1 - *word2;
+
+}
+
+void CreateSignature(FILE* fp, Header header) { 
+    fwrite(&header, sizeof(Header), 1, fp);
 }
 
 Error_proc GetCodePush(FILE* fp, int* cnt) {
@@ -363,11 +292,14 @@ Error_proc PutWordsPush(FILE* fp, char* word, int* cnt, int code_plus, int code_
 }
 
 Error_proc CheckNumName(char* word) {
-    if(word[0] == '.') {
+    if(strlen(word) == 0 || word[0] == '.') {
         return ERROR_ARG_NAME;
     }
 
     for(size_t c = 0; c < strlen(word); ++c) {
+        if(word[c] == '-' && c == 0) {
+            continue;
+        }
         if(!isdigit(word[c]) && word[c] != '.') {
             return ERROR_ARG_NAME;
         }
@@ -403,9 +335,12 @@ void PushWithPlus(FILE* fp, char* word, int* cnt, char* plus) {
 int StrToDouble(char numb_push[NUMBERS_LEN]) {
     int res = 0;
     for(size_t c = 0; c < strlen(numb_push); ++c) {
-        if(numb_push[c] != '.') {
+        if(numb_push[c] != '.' && numb_push[c] != '-') {
             res = res*10 + (numb_push[c] - '0');
         }
+    }
+    if(numb_push[0] == '-') {
+        return -res;
     }
     return res;
 }
@@ -432,10 +367,11 @@ Error_proc FullingLabels(struct Table_labels* labels, int* cnt, char* word) {
     printf("cnt: %d\n", *cnt);
     printf("label: %s\n", word);
 
-    if (labels -> size >= LABELS_SIZE_MAX) {
+    if (labels -> size >= LABELS_MAX_SIZE) {
         printf("Not enough labels ->  Realloc memory!\n");
         return ERROR_LABELS;
     }
+
     if(FindLabel(word, labels) != -1) {
         printf("Entering label one more tome!\n");
         return ERROR_TWICE_LABEL;

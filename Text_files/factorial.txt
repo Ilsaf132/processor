@@ -1,0 +1,26 @@
+in
+pop ax
+push ax
+pop bx
+HOME:
+push ax
+push 1
+sub
+push 1
+ja NEXT:
+push bx
+out
+hlt
+NEXT:
+push ax
+push 1
+sub 
+push bx
+mul
+pop bx
+push ax
+push 1
+sub 
+pop ax
+dump
+jmp HOME:
