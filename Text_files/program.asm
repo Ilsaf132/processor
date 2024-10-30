@@ -1,91 +1,48 @@
 in
 pop ax
-in
+push ax
+push 0.00
+je ZERO:
+push ax
+push 0.00
+jb BZRO:
+push ax
+push ax
+push 100.00
+div
+push 100.00
+mul
+sub
+push 0.00
+jne BZRO:
+push ax
 pop bx
-in
-pop cx
+HOME:
 push ax
-push 0.00
-jne ANZ:
+push 1.00
+sub
+push 1.00
+ja NEXT:
 push bx
-push 0.00
-jne BNZ:
-push cx 
-push 0.00
-jne CNZ:
-push -1.00
 out
 hlt
-CNZ: 
-push 0.00
-out
-hlt
-BNZ: 
+NEXT:
+push ax
+push 1.00
+sub 
+push bx
+mul
+pop bx
+push ax
+push 1.00
+sub 
+pop ax
+jmp HOME:
+ZERO:
 push 1.00
 out
-push cx
-push -1.00
-mul
-push bx
-div
-out
 hlt
-ANZ: 
-push bx
-push bx
-mul
-push 4.00
-push ax
-push cx
-mul
-mul
-sub
-pop dx
-push dx
-push 0.00
-jae DAZ:
+BZRO:
 push 0.00
 out
 hlt
-DAZ: 
-push dx
-push 0.00
-je DEZ:
-push 2.00
-out
-push bx
-push -1.00
-mul
-push dx
-sqrt
-sub
-push 2.00
-push ax
-mul
-div
-out
-push bx
-push -1.00
-mul
-push dx
-sqrt
-add
-push 2.00
-push ax
-mul
-div
-out
-hlt
-DEZ:
-push 1.00
-out
-push bx
-push -1.00
-mul
-push ax
-push 2.00
-mul
-div
-out
-hlt
-
